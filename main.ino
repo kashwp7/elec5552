@@ -1,7 +1,7 @@
 //Libraries
 
 // Pin Definition
-	// Data pins
+ // Data pins
 		// D I/O 1 -> D I/O 8
 const int GPIB_DATA[] = {};
 
