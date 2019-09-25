@@ -48,6 +48,12 @@ const int baud_loc = ;
 
 const int func_table[] = {};
 
+// Serial
+void setup_serial(){
+	Serial.begin(9600); 	//Debugging interface
+	Serial1.begin(9600);	//MS 232 interface
+}
+
 // setup fns
 void setup_Jacob(){
 	idle_setup();

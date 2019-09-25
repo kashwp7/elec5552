@@ -3,13 +3,18 @@
         {
             "name": "Linux",
             "includePath": [
+                "/home/kashwp7/apps/arduino-1.8.9/tools/**",
+                "/home/kashwp7/apps/arduino-1.8.9/hardware/arduino/avr/**",
                 "${workspaceFolder}/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c11",
             "cppStandard": "c++17",
-            "intelliSenseMode": "clang-x64"
+            "intelliSenseMode": "clang-x64",
+            "forcedInclude": [
+                "/home/kashwp7/apps/arduino-1.8.9/hardware/arduino/avr/cores/arduino/Arduino.h"
+            ]
         }
     ],
     "version": 4
