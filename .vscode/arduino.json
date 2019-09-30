@@ -1,5 +1,6 @@
 {
-    "programmer": "ArduinoISP",
+    "programmer": "Arduino as ISP",
     "board": "arduino:avr:mega",
-    "configuration": "cpu=atmega2560"
+    "configuration": "cpu=atmega2560",
+    "port": "COM4",
 }

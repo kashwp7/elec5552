@@ -5,7 +5,11 @@
             "includePath": [
                 "/home/kashwp7/apps/arduino-1.8.9/tools/**",
                 "/home/kashwp7/apps/arduino-1.8.9/hardware/arduino/avr/**",
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "C:\\Program Files (x86)\\Arduino\\hardware\\arduino\\avr\\**",
+                "C:\\Program Files (x86)\\Arduino\\tools\\**",
+                "C:\\Program Files (x86)\\Arduino\\libraries\\**",
+                "C:\\Program Files (x86)\\Arduino\\libraries\\LiquidCrystal\\src\\**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
@@ -13,7 +17,8 @@
             "cppStandard": "c++17",
             "intelliSenseMode": "clang-x64",
             "forcedInclude": [
-                "/home/kashwp7/apps/arduino-1.8.9/hardware/arduino/avr/cores/arduino/Arduino.h"
+                "/home/kashwp7/apps/arduino-1.8.9/hardware/arduino/avr/cores/arduino/Arduino.h",
+                "C:\\Program Files (x86)\\Arduino\\hardware\\arduino\\avr\\cores\\arduino\\Arduino.h"
             ]
         }
     ],

@@ -39,8 +39,10 @@ void displayControl(void);
 //--Controls-END
 
 //--Communications
-long debugBaud = 9600;
-long comBaud = 9600;
+int debugBaud = 6;
+int comBaud = 6;
+
+long baudRates[] = {4800, 9600, 14400, 19200, 38400, 57600, 115200};
 //--Communications-END
 
 //--General
@@ -53,8 +55,8 @@ void setup() {
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
   // initialize the serial communications
-  Serial.begin(debugBaud);
-  Serial1.begin(comBaud);
+  Serial.begin(baudRates[debugBaud]);
+  Serial1.begin(baudRates[comBaud]);
   //TODO Need to change this over to flash memory based
 }
 
@@ -122,48 +124,77 @@ void displayControl(void) {
 
     if (read_LCD_buttons(btnInputPin) == btnSELECT) { //Action for Select Button
       switch (conMenu) {
-      case 3:
-        conMenu = 0;
-        Serial.println("Reset conMenu")
-        break;
-      default:
-        conMenu++;
-        lcd.clear();
-        Serial.write("Select ");
-        Serial.println(conMenu);
-        break;
+        case 3:
+            conMenu = 0;
+            Serial.println("Reset conMenu");
+            break;
+        default:
+            conMenu++;
+            lcd.clear();
+            Serial.write("Select ");
+            Serial.println(conMenu);
+            break;
       }
     }
 
     if (read_LCD_buttons(btnInputPin) == btnUP) { //Action for Up Button
-      switch (conMenu) { //TODO
-      case 3:
-        conMenu = 0;
-        Serial.println("Reset conMenu")
-        break;
-      default:
-        conMenu++;
-        lcd.clear();
-        Serial.write("Select ");
-        Serial.println(conMenu);
-        break;
-      }
+        switch (conMenu) { //FIXME - Sometimes doesn't change baud rate
+            case 1:
+                if (comBaud >= ((sizeof(baudRates)/sizeof(baudRates[0])) - 1)) {
+                    comBaud = 0;
+                } else {
+                    comBaud++;
+                }
+                Serial.print("Changing Com Baud Rate to ");
+                Serial.println(baudRates[comBaud]);
+                Serial1.end();
+                Serial1.begin(baudRates[comBaud]);
+                break;
+            case 2:
+                if (debugBaud >= ((sizeof(baudRates)/sizeof(baudRates[0])) - 1)) {
+                    debugBaud = 0;
+                } else {
+                    debugBaud++;
+                }
+                Serial.print("Changing Debug Baud Rate to ");
+                Serial.println(baudRates[debugBaud]);
+                Serial.end();
+                Serial.begin(baudRates[debugBaud]);
+                break;
+            default:
+                break;
+        }
     }
 
     if (read_LCD_buttons(btnInputPin) == btnDOWN) { //Action for Down Button
-      switch (conMenu) { //TODO
-      case 3:
-        conMenu = 0;
-        Serial.println("Reset conMenu")
-        break;
-      default:
-        conMenu++;
-        lcd.clear();
-        Serial.write("Select ");
-        Serial.println(conMenu);
-        break;
-      }
+        switch (conMenu) { //FIXME - Sometimes doesn't change baud rate
+            case 1:
+                if (comBaud <= 0) {
+                    comBaud = ((sizeof(baudRates)/sizeof(baudRates[0])) - 1);
+                } else {
+                    comBaud--;
+                }
+                Serial.print("Changing Com Baud Rate to ");
+                Serial.println(baudRates[comBaud]);
+                Serial1.end();
+                Serial1.begin(baudRates[comBaud]);
+                break;
+            case 2:
+                if (debugBaud <= 0) {
+                    debugBaud = ((sizeof(baudRates)/sizeof(baudRates[0])) - 1);
+                } else {
+                    debugBaud--;
+                }
+                Serial.print("Changing Debug Baud Rate to ");
+                Serial.println(baudRates[debugBaud]);
+                Serial.end();
+                Serial.begin(baudRates[debugBaud]);
+                break;
+            default:
+                break;
+        }
     }
+
     delay(500);
     
   } else {
@@ -189,13 +220,27 @@ void displayControl(void) {
     }
     break;
   case 1:
-    //code
+    lcd.print("Coms Baud");
+    lcd.setCursor(0,1);
+    lcd.print(baudRates[comBaud]);
+    lcd.print("    ");
     break;
   case 2:
-    //code
+    lcd.print("Debug Baud");
+    lcd.setCursor(0,1);
+    lcd.print(baudRates[debugBaud]);
+    lcd.print("    ");
     break;
-  case 3: // Serial 1 Mon
-    //code
+  case 3:
+    lcd.print("Trans Data");
+    lcd.setCursor(0,1);
+    if (Serial.available()) {
+        delay(100);
+        while (Serial.available() > 0) {
+            lcd.write(Serial.read());
+        }
+        lcd.print("          ");
+    }
     break;
   default:
     conMenu = 0;
