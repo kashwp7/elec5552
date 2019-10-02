@@ -74,7 +74,6 @@ void setup(void) {
     // initialize the serial communications
     Serial.begin(baudRates[debugBaud]);
     Serial1.begin(baudRates[comBaud]);
-    //TODO - Need to change this over to flash memory based
 }
 
 void loop(void) {
@@ -156,7 +155,7 @@ void displayControl(void) {
     }
 
     if (read_LCD_buttons(btnInputPin) == btnUP) { //Action for Up Button
-        switch (conMenu) { //FIXME - Sometimes doesn't change baud rate
+        switch (conMenu) {
             case 1:
                 if (comBaud >= ((sizeof(baudRates)/sizeof(baudRates[0])) - 1)) {
                     comBaud = 0;
@@ -187,7 +186,7 @@ void displayControl(void) {
     }
 
     if (read_LCD_buttons(btnInputPin) == btnDOWN) { //Action for Down Button
-        switch (conMenu) { //FIXME - Sometimes doesn't change baud rate
+        switch (conMenu) {
             case 1:
                 if (comBaud <= 0) {
                     comBaud = ((sizeof(baudRates)/sizeof(baudRates[0])) - 1);
@@ -271,7 +270,6 @@ void displayControl(void) {
 }
 
 void eepromLoop(void) {
-    // TODO - EEPROM Loop Code
     EEPROM.get(dataAddress, storedData);
 
     //Debugging
