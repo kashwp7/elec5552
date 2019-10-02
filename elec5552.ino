@@ -9,6 +9,9 @@
 
 //Libraries
 #include <LiquidCrystal.h>
+#include <SPI.h>
+#include <SD.h>
+#include <EEPROM.h>
 
 //Initialisation
 //--LCD
@@ -16,11 +19,24 @@ const int rs = 8, en = 9, d4 = 4, d5 = 5, d6 = 6, d7 = 7;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 //--LCD-END
 
+//--EEPROM
+struct storageStruct { //Structure for the stored data
+    int debugBaud;
+    int comBaud;
+};
+
+storageStruct storedData; //initialising a variable to hold data in memory
+int dataAddress = 0; //Address where the data is stored
+
+void eepromLoop(void);
+//--EEPROM-END
+
 //--Buttons
 int btnInputPin = 0;
 int lcd_key     = 0;
 int adc_key_in  = 0;
 
+//definitions for the diffent buttons
 #define btnRIGHT  0
 #define btnUP     1
 #define btnDOWN   2
@@ -39,8 +55,8 @@ void displayControl(void);
 //--Controls-END
 
 //--Communications
-int debugBaud = 6;
-int comBaud = 6;
+int debugBaud;
+int comBaud;
 
 long baudRates[] = {4800, 9600, 14400, 19200, 38400, 57600, 115200};
 //--Communications-END
@@ -51,17 +67,19 @@ int serialErr = 0;
 int genErr = 0;
 //--General-END
 
-void setup() {
-  // set up the LCD's number of columns and rows:
-  lcd.begin(16, 2);
-  // initialize the serial communications
-  Serial.begin(baudRates[debugBaud]);
-  Serial1.begin(baudRates[comBaud]);
-  //TODO Need to change this over to flash memory based
+void setup(void) {
+    eepromLoop(); // to get the stored values
+    // set up the LCD's number of columns and rows:
+    lcd.begin(16, 2);
+    // initialize the serial communications
+    Serial.begin(baudRates[debugBaud]);
+    Serial1.begin(baudRates[comBaud]);
+    //TODO - Need to change this over to flash memory based
 }
 
-void loop() {
+void loop(void) {
   displayControl();
+  eepromLoop();
     
 
 }
@@ -147,6 +165,7 @@ void displayControl(void) {
                 }
                 Serial.print("Changing Com Baud Rate to ");
                 Serial.println(baudRates[comBaud]);
+                eepromWrite();
                 Serial1.end();
                 Serial1.begin(baudRates[comBaud]);
                 break;
@@ -158,6 +177,7 @@ void displayControl(void) {
                 }
                 Serial.print("Changing Debug Baud Rate to ");
                 Serial.println(baudRates[debugBaud]);
+                eepromWrite();
                 Serial.end();
                 Serial.begin(baudRates[debugBaud]);
                 break;
@@ -176,6 +196,7 @@ void displayControl(void) {
                 }
                 Serial.print("Changing Com Baud Rate to ");
                 Serial.println(baudRates[comBaud]);
+                eepromWrite();
                 Serial1.end();
                 Serial1.begin(baudRates[comBaud]);
                 break;
@@ -187,6 +208,7 @@ void displayControl(void) {
                 }
                 Serial.print("Changing Debug Baud Rate to ");
                 Serial.println(baudRates[debugBaud]);
+                eepromWrite();
                 Serial.end();
                 Serial.begin(baudRates[debugBaud]);
                 break;
@@ -246,4 +268,34 @@ void displayControl(void) {
     conMenu = 0;
     break;
   }
+}
+
+void eepromLoop(void) {
+    // TODO - EEPROM Loop Code
+    EEPROM.get(dataAddress, storedData);
+
+    //Debugging
+    Serial.print("Stored Debug: ");
+    Serial.println(storedData.debugBaud);
+    Serial.print("Stored Debug: ");
+    Serial.println(storedData.comBaud);
+
+    //Safe Gauds for reading data that is out of range
+    if ( storedData.debugBaud > ((sizeof(baudRates)/sizeof(baudRates[0])) - 1) || storedData.debugBaud < 0 ) {
+        debugBaud = 6;
+    } else {
+        debugBaud = storedData.debugBaud;
+    }
+
+    if ( storedData.comBaud > ((sizeof(baudRates)/sizeof(baudRates[0])) - 1) || storedData.comBaud < 0 ) {
+        comBaud = 6;
+    } else {
+        comBaud = storedData.comBaud;
+    }
+}
+
+void eepromWrite(void) {
+    storedData.comBaud = comBaud;
+    storedData.debugBaud = debugBaud;
+    EEPROM.put(dataAddress, storedData);
 }
