@@ -61,10 +61,20 @@ int comBaud;
 long baudRates[] = {4800, 9600, 14400, 19200, 38400, 57600, 115200};
 //--Communications-END
 
+//--Serial
+byte serialBuffer[255];
+int lenSerialBuffer = 0;
+
+void serialLoop(void);
+//--Serial-END
+
 //--General
 int gpibErr = 0;
 int serialErr = 0;
 int genErr = 0;
+
+void errTracking(int errType);
+void mb(void); // Main Function used to do the conversion of information
 //--General-END
 
 void setup(void) {
@@ -77,14 +87,31 @@ void setup(void) {
 }
 
 void loop(void) {
-  displayControl();
-  eepromLoop();
-    
+    displayControl();
+    eepromLoop();
 
+    if (Serial1.available() > 0)
+    {
+        serialLoop();
+    }
+    
+    // TODO - GPIB read if available
+    // if (/* condition */)
+    // {
+    //     /* code */
+    // }
+
+    mb(); // Main Control Function
+
+    while (Serial.available() > 0)
+    {
+        int inByte = Serial.read();
+        Serial1.write(inByte);
+    }
 }
 
 
-//Other Functions
+//Other Functions 
 int read_LCD_buttons(int pin) {
   
  adc_key_in = analogRead(pin);      // read the value from the sensor
@@ -108,31 +135,31 @@ void displayControl(void) {
     conTimer = millis();
 
     //Debugging Code
-    /*Serial.write("KEY PRESS ");
-    switch (read_LCD_buttons(btnInputPin))
-    {
-    case 0:
-      Serial.write("Right\n");
-      break;
-    case 1:
-      Serial.write("Up\n");
-      break;
-    case 2:
-      Serial.write("Down\n");
-      break;
-    case 3:
-      Serial.write("Left\n");
-      break;
-    case 4:
-      Serial.write("Select\n");
-      break;
-    default:
-      Serial.write("None\n");
-      break;
-    }*/
+    // Serial.write("KEY PRESS ");
+    // switch (read_LCD_buttons(btnInputPin))
+    // {
+    // case 0:
+    //   Serial.write("Right\n");
+    //   break;
+    // case 1:
+    //   Serial.write("Up\n");
+    //   break;
+    // case 2:
+    //   Serial.write("Down\n");
+    //   break;
+    // case 3:
+    //   Serial.write("Left\n");
+    //   break;
+    // case 4:
+    //   Serial.write("Select\n");
+    //   break;
+    // default:
+    //   Serial.write("None\n");
+    //   break;
+    // }
 
-    //int val = analogRead(0);
-    //Serial.println(val);
+    // int val = analogRead(0);
+    // Serial.println(val);
 
 
   }
@@ -143,12 +170,12 @@ void displayControl(void) {
       switch (conMenu) {
         case 3:
             conMenu = 0;
-            Serial.println("Reset conMenu");
+            Serial.println("Reset Menu");
             break;
         default:
             conMenu++;
             lcd.clear();
-            Serial.write("Select ");
+            Serial.write("Menu: ");
             Serial.println(conMenu);
             break;
       }
@@ -253,15 +280,9 @@ void displayControl(void) {
     lcd.print("    ");
     break;
   case 3:
-    lcd.print("Trans Data");
+    lcd.print("Trans Data"); //TODO - Convert this over to transmitted data
     lcd.setCursor(0,1);
-    if (Serial.available()) {
-        delay(100);
-        while (Serial.available() > 0) {
-            lcd.write(Serial.read());
-        }
-        lcd.print("          ");
-    }
+    lcd.print(serialBuffer[0] , BIN);
     break;
   default:
     conMenu = 0;
@@ -273,20 +294,22 @@ void eepromLoop(void) {
     EEPROM.get(dataAddress, storedData);
 
     //Debugging
-    Serial.print("Stored Debug: ");
-    Serial.println(storedData.debugBaud);
-    Serial.print("Stored Debug: ");
-    Serial.println(storedData.comBaud);
+    // Serial.print("Stored Debug: ");
+    // Serial.println(storedData.debugBaud);
+    // Serial.print("Stored Debug: ");
+    // Serial.println(storedData.comBaud);
 
     //Safe Gauds for reading data that is out of range
     if ( storedData.debugBaud > ((sizeof(baudRates)/sizeof(baudRates[0])) - 1) || storedData.debugBaud < 0 ) {
-        debugBaud = 6;
+        debugBaud = (sizeof(baudRates)/sizeof(baudRates[0])) - 1;
+        errTracking(0);
     } else {
         debugBaud = storedData.debugBaud;
     }
 
     if ( storedData.comBaud > ((sizeof(baudRates)/sizeof(baudRates[0])) - 1) || storedData.comBaud < 0 ) {
-        comBaud = 6;
+        comBaud = (sizeof(baudRates)/sizeof(baudRates[0])) - 1;
+        errTracking(0);
     } else {
         comBaud = storedData.comBaud;
     }
@@ -296,4 +319,62 @@ void eepromWrite(void) {
     storedData.comBaud = comBaud;
     storedData.debugBaud = debugBaud;
     EEPROM.put(dataAddress, storedData);
+}
+
+void errTracking(int errType) {
+    Serial.println("----ERROR----");
+    switch (errType) {
+    case 0:
+        Serial.println("EEPROM: Values read are out of range");
+        Serial.println("EEPROM: Setting Values to defaults");
+        genErr++;
+        break;
+    
+    case 1:
+        Serial.println("SERIAL: Serial Buffer is Full");
+        serialErr++;
+        break;
+    
+    default:
+        break;
+    }
+}
+
+void serialLoop(void) {
+    int i = 0;
+    int Bt = 0;
+
+    do
+    {
+        i++;
+        Bt = Serial1.read();
+        if (Bt == -1)
+        {
+            break;
+        } else {
+            serialBuffer[i-1] = (byte)Bt;
+        }
+    } while (Serial1.available() > 0 && i < 255);
+
+    if (Bt == -1) {
+        lenSerialBuffer = i - 1;
+    } else {
+        lenSerialBuffer = i;
+    }
+    
+    if (Serial1.available() > 0 && i >= 255) { //Checking if Serial Buffer is full
+        errTracking(1);
+    }
+}
+
+void mb(void) {
+
+    if (lenSerialBuffer > 0)
+    {
+        Serial.println("SERIAL--START");
+        Serial.write(serialBuffer, lenSerialBuffer);
+        lenSerialBuffer = 0;
+        Serial.println("");
+        Serial.println("SERIAL--END");
+    }
 }
