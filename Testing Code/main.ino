@@ -1,7 +1,7 @@
 //Libraries
 
 // Pin Definition
- // Data pins
+	// Data pins
 		// D I/O 1 -> D I/O 8
 const int GPIB_DATA[] = {};
 
@@ -19,67 +19,47 @@ const int GPIB_NDAC = ;
 const int GPIB_CONTROL[] = {GPIB_REN, GPIB_ATN, GPIB_SRQ, GPIB_IFC, GPIB_EOI};
 const int GPIB_SHAKE[] = {GPIB_NDAC, GPIB_NRFD, GPIB_DAV};
 
-// mode
+	// LCD pins
+	
+	// Serial pins
+
+// GPIB mode
+const int mode_idle = 0;
 const int mode_listen = 1;
-const int mode_process = 2;
-int mode = mode_process;
-bool skip_dav = FALSE;
+const int mode_talk = 2;
+const int mode_secondary = 3;
+int mode = mode_idle;
 
 // delay length (in ms)
 const long del_t = ;
 const int itr_max = ;
 
-// buffer setup
-const int buff_size = 16;
+// GPIB buffer setup
+const int buff_size = 255;
 int buff_GPIB[buff_size];
 int buff_GPIB_head = 0;
 int buff_GPIB_tail = 0;
 int buff_GPIB_count = 0;
 
-// address and baud rate, + non-volatile memory locations
-byte add_own;
-const int add_loc = ;
-long baud_own;
-const int baud_size = ;
-const long baud_lookup[] = {};
-const int baud_loc = ;
-
-// GPIB function definitions
-
-const int func_table[] = {};
-
-// Serial
-void setup_serial(){
-	Serial.begin(9600); 	//Debugging interface
-	Serial1.begin(9600);	//MS 232 interface
-}
+// Address
+int add_own = ;
 
 // setup fns
-void setup_Jacob(){
-	idle_setup();
+void setup_GPIB(void) {
+	// pin mode setup
+	listen_setup();
 	interupt_setup();
-	get_address();
-	get_baud();
+	
+	// empty buffers
+	buff_GPIB_count = 0;
+		// empty RS232 buffer	
 }
 
-void main_GPIB(){
-	switch (mode) {
-		case mode_process:
-			process();
-			break;
-		case mode_listen:
-			listen_GPIB();
-			break;
-	}
-	
-	
-}
-
-void interupt_setup() {
+void interupt_setup(void) {
 	attachInterrupt(digitalPinToInterrupt(GPIB_IFC), run_IFC, FALLING);
 }
 
-void listen_setup() {
+void listen_setup(void) {
 	// set data and command pins to input
 	for (int ii = 7; ii >= 0; ii--) {
 		pinMode(GPIB_DATA[ii], INPUT);
@@ -87,6 +67,8 @@ void listen_setup() {
 	for (int ii = 4; ii >= 0; ii--) {
 		pinMode(GPIB_CONTROL[ii], INPUT);
 	}
+	pinMode(GPIB_SRQ, OUTPUT);
+	digitalWrite(GPIB_SRQ,HIGH);
 	
 	// setup handshakes
 	pinMode(GPIB_DAV, INPUT);
@@ -96,8 +78,7 @@ void listen_setup() {
 	digitalWrite(GPIB_NDAC, LOW);
 }
 
-void talk_setup() {
-	
+void talk_setup(void) {	
 	// set data pins to output
 	for (int ii = 7; ii >= 0; ii--) {
 		pinMode(GPIB_DATA[ii], OUTPUT);
@@ -119,40 +100,48 @@ void talk_setup() {
 	pinMode(GPIB_NDAC, INPUT);
 }
 
-void idle_setup() {
-	// set all pins to input
-	for (int ii = 7; ii >= 0; ii--) {
-		pinMode(GPIB_DATA[ii], INPUT);
-	}
-	for (int ii = 4; ii >= 0; ii--) {
-		pinMode(GPIB_CONTROL[ii], INPUT);
-	}
-	pinMode(GPIB_DAV, INPUT);
-	pinMode(GPIB_NRFD, INPUT);
-	pinMode(GPIB_NDAC, INPUT);
+void main_GPIB(void) {
+	listen_GPIB();
 }
 
-void listen_GPIB() {
+void listen_GPIB(void) {
 	int itr_count = 0;
 	// set up pin input/output modes
+	listen_setup();
 
-	// checks if data has been prevalidated
-	if(skip_dav){
-		skip_dav = FALSE;		
+	// set not ready for data to FALSE
+	digitalWrite(GPIB_NRFD, HIGH);
+
+	// wait until data is validated
+	int itr_count = 0;
+	dav = digitalRead(GPIB_DAV);
+	while(dav == HIGH){
+		dav = digitalRead(GPIB_DAV);
+		delay(del_t);
+		// if device times out, process GPIB buffer
+		if(itr_count > itr_max) {
+			digitalWrite(GPIB_NRFD, LOW);
+			process_GPIB();
+			itr_count = 0;
+			digitalWrite(GPIB_NRFD, HIGH);			
+		}
+		itr_count++;
 	}
-	else{
-		listen_setup();
-		bool dav_val = run_dav();
-		if(!dav_val) {
-			mode = mode_process;
-			return;
-		}			
-	}
-	
+
 	int data = read_GPIB();
 	
-	//	write data to buffer
-	write_GPIB_buff(data);
+	int atn = bitRead(data,9);
+	int is_process = atn * (bitRead(data,6) | bitRead(data,5));
+	
+	if(atn == 1 || mode == mode_listen) {
+		// data to buffer only if it is either a command or device is listening
+		write_GPIB_buff(data);
+	}
+	
+	if(is_process == 1) {
+		// process GPIB buffer if any device is addressed (talk or listen) or untalk/unlisten
+		process_GPIB();
+	}
 	
 	// set ready for data to false
 	digitalWrite(GPIB_NRFD, LOW);
@@ -166,13 +155,14 @@ void listen_GPIB() {
 		dav = digitalRead(GPIB_DAV);
 		delay(del_t);
 		// timeout
+			// add appropriate timeout
 		itr_count++;
 	}
 	// set data accepted to false
 	digitalWrite(GPIB_NDAC, LOW);
 }
 
-void talk_GPIB(int data){
+void talk_GPIB(int data) {
 	
 	// set up pin input/output modes
 	talk_setup();
@@ -201,19 +191,70 @@ void talk_GPIB(int data){
 	}
 	
 	// set data valid to false
-	digitalWrite(GPIB_DAV, HIGH);	
+	digitalWrite(GPIB_DAV, HIGH);
+}
+
+void process_GPIB(void) {
+	// Process all the commands/data present in the GPIB buffer
+	while(buff_GPIB_count > 0){
+		int buff = read_GPIB_buff();
+		int comms = buff / 256;
+		int data = buff % 256;
+		
+		int atn = bitRead(comms, 1);
+		if (atn == 1){
+			int command_mode = ((data / 32) % 4);
+			switch command_mode {
+				case mode_idle:
+					int data_mod = data % 128;
+					if(data_mod == 20){
+						// device clear
+						setup_GPIB();						
+					}
+					break;
+					
+				case mode_listen:
+					int add = data % 32;
+					if(add == add_own){
+						// MLA
+						mode = mode_listen;
+					}
+					
+					if(add == 31){
+						// unlisten
+						mode = mode_idle;
+					}
+					break;
+					
+				case mode_talk:
+					int add = data % 32;
+					if(add == add_own){
+						// MTA
+						process_Serial();
+					}
+					
+					// add untalk if necesaary
+					break;
+					
+				case mode_secondary:
+					// No commands here yet
+					break;
+								
+			} 
+		} else {
+			// Send data straigh thru to Serial
+		}
+		
+	}
+}
+
+void process_Serial(void) {
+	// Send all the data in the serial buffer
+	// for each piece of data in the Serial buffer, use talk_GPIB(data)
 	
 }
 
-void process_GPIB(){
-	skip_dav = run_dav();
-	if(skip_dav) return;
-	// read buffer
-	// check for commands
-	// otherwise pass on directly
-}
-
-int read_GPIB(){
+int read_GPIB(void) {
 	// read control pins
 	int data = 0;
 	for (int ii = 4; ii >= 0; ii--) {
@@ -231,7 +272,7 @@ int read_GPIB(){
 	return data;
 }
 
-void write_GPIB(int data){
+void write_GPIB(int data) {
 	for(int ii = 0; ii <= 7; ii++){
 		int data_ii = bitRead(data, ii);
 		if(data_ii == 1){
@@ -259,66 +300,19 @@ void write_GPIB(int data){
 	}
 }
 
-void write_GPIB_buff(int data){
+void write_GPIB_buff(int data) {
 	buff_GPIB[buff_GPIB_head] = data;
 	buff_GPIB_head = (buff_GPIB_head + 1) % buff_size;
 	buff_GPIB_count++;
 }
 
-int read_GPIB_buff(){
+int read_GPIB_buff(void) {
 	int data = buff_GPIB[buff_GPIB_tail];
 	buff_GPIB_tail = (buff_GPIB_tail + 1) % buff_size;
 	buff_GPIB_count--;
 	return data;
 }
 
-void run_IFC(){
+void run_IFC(void) {
 	return;
-}
-
-bool out run_dav(){
-	// check buffer overflow
-	if(buff_GPIB_count >= buff_size){
-		mode = mode_process;
-		return FALSE;
-	}
-	// check for data
-		// set not ready for data to false
-	digitalWrite(GPIB_NRFD, HIGH);
-	
-	int itr_count = 0;
-	dav = digitalRead(GPIB_DAV);
-	while(dav == HIGH){
-		dav = digitalRead(GPIB_DAV);
-		itr_count++;
-		if(itr_count > itr_max){
-			mode = mode_process;
-			digitalWrite(GPIB_NRFD, LOW);
-			return FALSE;
-		}
-	}
-	return TRUE;
-}
-
-void get_address(){
-	add_own = EEPROM.read(add_loc);
-}
-
-void set_address(byte add_new){
-	add_own = add_new;
-	EEPROM.update(add_loc, add_new);	
-}
-
-void get_baud(){
-	int ii = EEPROM.read(baud_loc);
-	baud_own = baud_lookup[ii];
-	// set RS-232 rate
-}
-
-void set_baud(byte baud_new){
-	if(baud_new < baud_size){
-		baud_own = baud_lookup[baud_new];
-		EEPROM.update(baud_loc, baud_new);
-	}
-	// set RS-232 rate
 }
