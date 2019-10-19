@@ -23,6 +23,7 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 struct storageStruct { //Structure for the stored data
     int debugBaud;
     int comBaud;
+    byte add;
 };
 
 storageStruct storedData; //initialising a variable to hold data in memory
@@ -57,6 +58,9 @@ void displayControl(void);
 //--Communications
 int debugBaud;
 int comBaud;
+
+
+byte add_own =  12;
 
 long baudRates[] = {4800, 9600, 14400, 19200, 38400, 57600, 115200};
 //--Communications-END
@@ -207,6 +211,16 @@ void displayControl(void) {
                 Serial.end();
                 Serial.begin(baudRates[debugBaud]);
                 break;
+            case 3:
+                if (add_own >= 30) {
+                    add_own = 0;
+                } else {
+                    add_own++;
+                }
+                Serial.print("Changing Address");
+                Serial.println(add_own);
+                eepromWrite();
+                break;
             default:
                 break;
         }
@@ -237,6 +251,16 @@ void displayControl(void) {
                 eepromWrite();
                 Serial.end();
                 Serial.begin(baudRates[debugBaud]);
+                break;
+            case 3:
+                if (add_own <= 0) {
+                    add_own = 30;
+                } else {
+                    add_own--;
+                }
+                Serial.print("Address Change ");
+                Serial.println(add_own);
+                eepromWrite();
                 break;
             default:
                 break;
@@ -280,9 +304,10 @@ void displayControl(void) {
     lcd.print("    ");
     break;
   case 3:
-    lcd.print("Trans Data"); //TODO - Convert this over to transmitted data
+    lcd.print("Address GPIB"); //TODO - Convert this over to transmitted data
     lcd.setCursor(0,1);
-    lcd.print(serialBuffer[0] , BIN);
+    lcd.print(add_own , DEC);
+    lcd.print("    ");
     break;
   default:
     conMenu = 0;
@@ -313,11 +338,14 @@ void eepromLoop(void) {
     } else {
         comBaud = storedData.comBaud;
     }
+
+    add_own = storedData.add;
 }
 
 void eepromWrite(void) {
     storedData.comBaud = comBaud;
     storedData.debugBaud = debugBaud;
+    storedData.add = add_own;
     EEPROM.put(dataAddress, storedData);
 }
 
